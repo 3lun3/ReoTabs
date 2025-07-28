@@ -80,18 +80,17 @@ import mouse
 import pygetwindow as gw
 import win32gui
 import win32com.client
-# ## NUEVO: Función para encontrar archivos empaquetados en el .exe ##
+
+# ## Función para encontrar archivos empaquetados en el .exe ##
 def resource_path(relative_path):
     """ Obtiene la ruta absoluta al recurso, funciona para dev y para PyInstaller """
     try:
-        # PyInstaller crea una carpeta temporal y guarda la ruta en _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
         base_path = os.path.abspath(".")
-
     return os.path.join(base_path, relative_path)
 
-# (Las clases KeyCaptureButton no necesitan cambios)
+# (La clase KeyCaptureButton no cambia)
 class KeyCaptureButton(QPushButton):
     key_captured = pyqtSignal(str)
     def __init__(self, parent=None):
@@ -141,8 +140,9 @@ class ConfigWindow(QWidget):
     def __init__(self, initial_keybinds: dict):
         super().__init__()
         self.setWindowTitle('ReoTabs - Configuración')
-        self.setGeometry(100, 100, 350, 350)
-        self.setWindowIcon(QIcon('imagenes_dofus/ReoTabs.png'))
+        self.setGeometry(100, 100, 350, 500) # Ajusté el tamaño para que quepa todo bien
+        # ## CAMBIO: Se usa resource_path para el icono de la ventana ##
+        self.setWindowIcon(QIcon(resource_path('imagenes_dofus/ReoTabs.png')))
         main_layout = QVBoxLayout()
         self.list_widget = QListWidget()
         self.list_widget.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
@@ -201,10 +201,10 @@ class ConfigWindow(QWidget):
             for win in dofus_windows:
                 if not win.visible: continue
                 parts = win.title.split(' - ')
-                # ## CORRECCIÓN: Se usan corchetes [] en lugar de paréntesis ()
                 char_name, char_class = parts[0], parts[1]
                 item = QListWidgetItem(char_name)
-                icon_path = f"imagenes_dofus/{char_class}.png"
+                # ## CAMBIO: Se usa resource_path para los iconos de la lista ##
+                icon_path = resource_path(f"imagenes_dofus/{char_class}.png")
                 item.setIcon(QIcon(icon_path))
                 item_data = {"name": char_name, "class": char_class, "hwnd": win._hWnd}
                 item.setData(Qt.ItemDataRole.UserRole, item_data)
@@ -212,88 +212,49 @@ class ConfigWindow(QWidget):
         except Exception as e:
             print(f"Error al buscar ventanas: {e}")
 
-# --- CLASE PARA LA VENTANA HUD (MODIFICADA) ---
-# --- CLASE PARA LA VENTANA HUD (CORREGIDA) ---
 class HudWindow(QWidget):
     return_to_config_signal = pyqtSignal()
     moved_and_released_signal = pyqtSignal(QPoint)
-
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        
-        # ## CORRECCIÓN: Definimos los tamaños en un solo lugar ##
-        # --- ¡MODIFICA ESTOS VALORES PARA CAMBIAR EL TAMAÑO! ---
-        self.size_current = 45  # Tamaño del icono central
-        self.size_adjacent = 30 # Tamaño de los iconos laterales
-        # ---------------------------------------------------------
-
+        self.size_current, self.size_adjacent = 45, 30
         main_layout = QHBoxLayout()
         main_layout.setContentsMargins(10, 5, 10, 5)
         main_layout.setSpacing(10)
-
-        self.prev_icon_label = QLabel()
-        self.current_icon_label = QLabel()
-        self.next_icon_label = QLabel()
-
-        # Usamos las variables de tamaño que definimos arriba
+        self.prev_icon_label, self.current_icon_label, self.next_icon_label = QLabel(), QLabel(), QLabel()
         self.prev_icon_label.setFixedSize(self.size_adjacent, self.size_adjacent)
         self.current_icon_label.setFixedSize(self.size_current, self.size_current)
         self.next_icon_label.setFixedSize(self.size_adjacent, self.size_adjacent)
-
-        self.prev_name_label = QLabel(self.prev_icon_label)
-        self.current_name_label = QLabel(self.current_icon_label)
-        self.next_name_label = QLabel(self.next_icon_label)
-
-        name_font = QFont("Arial", 10, QFont.Weight.Bold) # Puedes ajustar el tamaño de la letra si es necesario
-        name_style = ("color: white; "
-                      "background-color: rgba(0, 0, 0, 0.6); "
-                      "border-radius: 3px; "
-                      "padding: 0px 2px;")
+        self.prev_name_label, self.current_name_label, self.next_name_label = QLabel(self.prev_icon_label), QLabel(self.current_icon_label), QLabel(self.next_icon_label)
+        name_font, name_style = QFont("Arial", 10, QFont.Weight.Bold), ("color: white; background-color: rgba(0, 0, 0, 0.6); border-radius: 3px; padding: 0px 2px;")
         for name_label in [self.prev_name_label, self.current_name_label, self.next_name_label]:
             name_label.setFont(name_font)
             name_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom)
             name_label.setStyleSheet(name_style)
-
         main_layout.addWidget(self.prev_icon_label)
         main_layout.addWidget(self.current_icon_label)
         main_layout.addWidget(self.next_icon_label)
-
         self.setLayout(main_layout)
         self.drag_pos = QPoint()
         self.show()
-
     def update_display(self, character_list, current_index, class_counts):
         count = len(character_list)
-        
-        # ## CORRECCIÓN: Usamos las variables de tamaño también para escalar la imagen ##
-        char_positions = {
-            "prev": (self.prev_icon_label, self.prev_name_label, self.size_adjacent, character_list[(current_index - 1) % count]),
-            "current": (self.current_icon_label, self.current_name_label, self.size_current, character_list[current_index]),
-            "next": (self.next_icon_label, self.next_name_label, self.size_adjacent, character_list[(current_index + 1) % count])
-        }
-
+        char_positions = {"prev": (self.prev_icon_label, self.prev_name_label, self.size_adjacent, character_list[(current_index - 1) % count]), "current": (self.current_icon_label, self.current_name_label, self.size_current, character_list[current_index]), "next": (self.next_icon_label, self.next_name_label, self.size_adjacent, character_list[(current_index + 1) % count])}
         for pos_name, (icon_label, name_label, size, char_data) in char_positions.items():
-            pixmap = QPixmap(f'imagenes_dofus/{char_data["class"]}.png')
-            # La imagen se escala al mismo tamaño que su contenedor
+            # ## CAMBIO: Se usa resource_path para los iconos del HUD ##
+            pixmap = QPixmap(resource_path(f'imagenes_dofus/{char_data["class"]}.png'))
             icon_label.setPixmap(pixmap.scaled(size, size, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-
-            # Posicionamos la etiqueta del nombre dinámicamente
-            name_label.adjustSize() # Ajusta el tamaño al texto
-            # Centra la etiqueta en la parte inferior del icono
-            x_pos = (icon_label.width() - name_label.width()) // 2
-            y_pos = icon_label.height() - name_label.height()
+            name_label.adjustSize()
+            x_pos, y_pos = (icon_label.width() - name_label.width()) // 2, icon_label.height() - name_label.height()
             name_label.move(x_pos, y_pos)
-
             if class_counts[char_data["class"]] > 1:
                 name_label.setText(char_data["title"][0].upper())
                 name_label.show()
             else:
                 name_label.setText("")
                 name_label.hide()
-    
-    # (El resto de HudWindow no cambia)
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton: self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft(); event.accept()
         elif event.button() == Qt.MouseButton.RightButton: self.return_to_config_signal.emit(); event.accept()
@@ -302,15 +263,13 @@ class HudWindow(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton: self.moved_and_released_signal.emit(self.pos()); event.accept()
 
-# --- CLASE PRINCIPAL QUE CONTROLA TODO (MODIFICADA) ---
 class ReoTabsApp:
     def __init__(self):
-        # ... (sin cambios) ...
-        self.character_list = []
-        self.class_counts = {}
+        self.character_list, self.class_counts = [], {}
         self.current_index, self.is_paused, self.tracking_active = 0, False, False
         self.shell = win32com.client.Dispatch("WScript.Shell")
-        self.settings_file = 'reotabs_settings.json'
+        # ## CAMBIO: Se usa resource_path para el archivo de configuración ##
+        self.settings_file = resource_path('reotabs_settings.json')
         self.keybinds, hud_pos = self.load_settings()
         self.app = QApplication(sys.argv)
         self.config_window = ConfigWindow(self.keybinds)
@@ -321,8 +280,26 @@ class ReoTabsApp:
         self.hud.return_to_config_signal.connect(self.show_config_view)
         self.hud.moved_and_released_signal.connect(self.save_settings)
         self.config_window.show()
+    def load_settings(self):
+        try:
+            with open(self.settings_file, 'r') as f:
+                settings = json.load(f)
+                keybinds, hud_pos = settings.get("keybinds", {}), settings.get("hud_pos")
+                print("Configuración cargada.")
+                return keybinds, hud_pos
+        except (FileNotFoundError, json.JSONDecodeError):
+            print("No se encontró archivo de configuración. Usando valores por defecto.")
+            return {"prev": "alt+1", "next": "alt+2", "pause": "middle mouse"}, None
+    def save_settings(self):
+        try:
+            current_keybinds = {"prev": self.config_window.prev_key_input.text(), "next": self.config_window.next_key_input.text(), "pause": self.config_window.pause_key_input.text()}
+            pos = self.hud.pos(); hud_pos = {"x": pos.x(), "y": pos.y()}
+            settings = {"keybinds": current_keybinds, "hud_pos": hud_pos}
+            with open(self.settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+                print(f"Configuración guardada: {settings}")
+        except Exception as e: print(f"No se pudo guardar la configuración: {e}")
     def start_hotkey_mode(self, ordered_list, keybinds):
-        # ... (sin cambios) ...
         self.keybinds = keybinds
         self.save_settings()
         self.character_list = ordered_list
@@ -345,52 +322,6 @@ class ReoTabsApp:
         self.tracking_thread = threading.Thread(target=self.track_active_window, daemon=True)
         self.tracking_thread.start()
         print("Atajos y tracking de ventana activados.")
-    def track_active_window(self):
-        while self.tracking_active:
-            try:
-                current_hwnd = win32gui.GetForegroundWindow()
-                for i, char_info in enumerate(self.character_list):
-                    if char_info["hwnd"] == current_hwnd and i != self.current_index:
-                        self.current_index = i
-                        self.hud.update_display(self.character_list, self.current_index, self.class_counts)
-                        break
-            except Exception: pass
-            time.sleep(0.25)
-    def update_window_focus(self, direction):
-        _update_window_focus_lock = threading.Lock()
-        if self.is_paused or not self.character_list: return
-        with _update_window_focus_lock:
-            new_index = (self.current_index + direction) % len(self.character_list)
-            self.current_index = new_index
-            try:
-                # ## CORRECCIÓN: Se usan corchetes []
-                target_char = self.character_list[self.current_index]
-                hwnd = target_char["hwnd"]
-                self.shell.SendKeys('%'); win32gui.SetForegroundWindow(hwnd)
-                print(f"Cambiando a: {target_char['title']}")
-                self.hud.update_display(self.character_list, self.current_index, self.class_counts)
-            except Exception as e: print(f"Error al cambiar de ventana: {e}")
-    # (El resto de funciones no cambia)
-    def load_settings(self):
-        try:
-            with open(self.settings_file, 'r') as f:
-                settings = json.load(f)
-                keybinds = settings.get("keybinds", {})
-                hud_pos = settings.get("hud_pos")
-                print("Configuración cargada.")
-                return keybinds, hud_pos
-        except (FileNotFoundError, json.JSONDecodeError):
-            print("No se encontró archivo de configuración. Usando valores por defecto.")
-            return {"prev": "alt+1", "next": "alt+2", "pause": "middle mouse"}, None
-    def save_settings(self):
-        try:
-            current_keybinds = {"prev": self.config_window.prev_key_input.text(), "next": self.config_window.next_key_input.text(), "pause": self.config_window.pause_key_input.text()}
-            pos = self.hud.pos(); hud_pos = {"x": pos.x(), "y": pos.y()}
-            settings = {"keybinds": current_keybinds, "hud_pos": hud_pos}
-            with open(self.settings_file, 'w') as f:
-                json.dump(settings, f, indent=4)
-                print(f"Configuración guardada: {settings}")
-        except Exception as e: print(f"No se pudo guardar la configuración: {e}")
     def show_config_view(self):
         print("Volviendo a la ventana de configuración..."); self.save_settings()
         self.tracking_active = False
@@ -400,6 +331,28 @@ class ReoTabsApp:
         self.is_paused = not self.is_paused
         status = "Pausado" if self.is_paused else "Reanudado"; print(f"Script {status}.")
         self.hud.setWindowOpacity(0.5 if self.is_paused else 1.0)
+    def track_active_window(self):
+        while self.tracking_active:
+            try:
+                current_hwnd = win32gui.GetForegroundWindow()
+                for i, char_info in enumerate(self.character_list):
+                    if char_info["hwnd"] == current_hwnd and i != self.current_index:
+                        self.current_index = i; self.hud.update_display(self.character_list, self.current_index, self.class_counts); break
+            except Exception: pass
+            time.sleep(0.25)
+    _update_window_focus_lock = threading.Lock()
+    def update_window_focus(self, direction):
+        if self.is_paused or not self.character_list: return
+        with self._update_window_focus_lock:
+            new_index = (self.current_index + direction) % len(self.character_list)
+            self.current_index = new_index
+            try:
+                target_char = self.character_list[self.current_index]
+                hwnd = target_char["hwnd"]
+                self.shell.SendKeys('%'); win32gui.SetForegroundWindow(hwnd)
+                print(f"Cambiando a: {target_char['title']}")
+                self.hud.update_display(self.character_list, self.current_index, self.class_counts)
+            except Exception as e: print(f"Error al cambiar de ventana: {e}")
     def switch_to_next_window(self): self.update_window_focus(1)
     def switch_to_previous_window(self): self.update_window_focus(-1)
 
